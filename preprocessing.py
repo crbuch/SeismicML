@@ -1,26 +1,41 @@
-import torch
-from torchvision.transforms.functional import pad, crop
 import numpy as np
 
+def pad_or_crop_3d_array(array, target_shape):
+    # Get the current shape of the array
+    current_shape = array.shape
+    
+    # Initialize padding or cropping parameters
+    pad_width = []
+    crop_slices = []
+    
+    # Calculate padding or cropping for each dimension
+    for i in range(3):
+        diff = target_shape[i] - current_shape[i]
+        if diff > 0:
+            # Pad the array
+            pad_before = diff // 2
+            pad_after = diff - pad_before
+            pad_width.append((pad_before, pad_after))
+            crop_slices.append(slice(None))
+        elif diff < 0:
+            # Crop the array
+            crop_start = abs(diff) // 2
+            crop_end = current_shape[i] - (abs(diff) - crop_start)
+            crop_slices.append(slice(crop_start, crop_end))
+            pad_width.append((0, 0))
+        else:
+            # No padding or cropping needed
+            pad_width.append((0, 0))
+            crop_slices.append(slice(None))
+    
+    # Pad or crop the array
+    if np.any(np.array(pad_width) != (0, 0)):
+        padded_array = np.pad(array, pad_width, mode='constant', constant_values=0)
+    else:
+        padded_array = array[crop_slices[0], crop_slices[1], crop_slices[2]]
+    
+    return padded_array
 
-def cropAndOrPad(a:np.array, targetSize:tuple) -> torch.tensor:
-
-    pad_top = max(0, (targetSize[1] - a.shape[0]) // 2)
-    pad_bottom = max(0, targetSize[1] - a.shape[0] - pad_top)
-    pad_left = max(0, (targetSize[0] - a.shape[1]) // 2)
-    pad_right = max(0, targetSize[0] - a.shape[1] - pad_left)
-
-    image = pad(torch.from_numpy(a), (pad_left, pad_top, pad_right, pad_bottom), fill=0 )
-
-    top =  round((image.size(0)/2)-(image.size(0)/2))
-    left =  round((image.size(1)/2)-(image.size(1)/2))
-    height = targetSize[1]
-    width = targetSize[0]
-
-    image = crop(image, top, left, width, height)
-
-
-    return image
 
 
 def to3dArray(stream):
