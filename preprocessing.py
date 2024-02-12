@@ -56,10 +56,10 @@ def to3dArray(stream):
         seismic_3d_array[inline, crossline, :] = trace.data
 
 
+
     new_3d_arr = []
 
     for i in range(crossline_length):
         new_3d_arr.append(np.flipud(np.rot90(seismic_3d_array[:, i, :])))
-    new_3d_arr = np.array(new_3d_arr)
-    return new_3d_arr
+    return np.array(new_3d_arr)
 
