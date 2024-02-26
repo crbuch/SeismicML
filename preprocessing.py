@@ -1,4 +1,102 @@
 import numpy as np
+import math
+
+
+class Seismic:
+    @staticmethod
+    def __get_FFID(trace):
+        header = trace.stats.segy.trace_header
+        return int.from_bytes(header.unpacked_header[8:12], byteorder="little" if header.endian=="<" else "big")
+
+    @staticmethod
+    def __get_xy(trace):
+        header = trace.stats.segy.trace_header
+        return int.from_bytes(header.unpacked_header[72:76], byteorder="little" if header.endian=="<" else "big"), int.from_bytes(header.unpacked_header[76:80], byteorder="little" if header.endian=="<" else "big")
+
+    def __init__(self, stream):
+        self.stream = stream
+
+        self.min_FFID = float("inf")
+        self.max_FFID = -float("inf")
+
+        self.min_x = float("inf")
+        self.max_x = -float("inf")
+
+        self.min_y = float("inf")
+        self.max_y = -float("inf")
+
+        for trace in self.stream:
+            ffid = Seismic.__get_FFID(trace)
+            if ffid>self.max_FFID:
+                self.max_FFID = ffid
+            elif ffid<self.min_FFID:
+                self.min_FFID = ffid
+            x, y = Seismic.__get_xy(trace)
+            if x > self.max_x:
+                self.max_x = x
+            if x < self.min_x:
+                self.min_x = x
+
+            if y > self.max_y:
+                self.max_y = y
+            if y < self.min_y:
+                self.min_y = y
+        
+        self.num_inlines = [0]
+        self.last_ffid = Seismic.__get_FFID(stream[0])
+
+        traces = []
+        for trace in self.stream:
+            traces.append(trace)
+            ffid = Seismic.__get_FFID(trace)
+            if ffid!=self.last_ffid:
+                self.num_inlines.append(0)
+            self.num_inlines[-1] += 1
+            self.last_ffid = ffid
+
+        
+        self.num_inlines = np.bincount(self.num_inlines).argmax()
+        self.num_crosslines = len(self.stream)//self.num_inlines
+        self.sample_depth = len(self.stream[0])
+
+        self.trace_array = []
+        for ct, trace in enumerate(traces):
+            if ct%self.num_inlines==0:
+                self.trace_array.append([])
+            self.trace_array[-1].append(trace)
+
+
+        if(len(self.trace_array[-1])!=self.num_inlines):
+            self.trace_array.pop()
+
+
+        self.seismic_array = []
+        for x in range(len(self.trace_array)):
+            self.seismic_array.append([])
+            for y in range(len(self.trace_array[0])):
+                self.seismic_array[-1].append(self.trace_array[x][y].data)
+
+
+        self.seismic_array = np.array(self.seismic_array)
+
+
+    def get_index_from_coordinate(self, x, y, sample):
+        closestIdx = (0, 0, 0)
+        closestDist = float("inf")
+        target_coordinate = (x, y, sample)
+        
+        for x in range(len(self.trace_array)):
+            for y in range(len(self.trace_array[0])):
+                traceX, traceY = Seismic.__get_xy(self.trace_array[x][y])
+
+                dist = math.sqrt((traceX-target_coordinate[0])**2+(traceY-target_coordinate[1])**2)
+
+                if dist < closestDist:
+                    closestDist = dist
+                    closestIdx = (x, y, round(target_coordinate[2]))
+        return closestIdx
+
+
 
 def pad_or_crop_3d_array(array, target_shape):
     # Get the current shape of the array
@@ -35,31 +133,4 @@ def pad_or_crop_3d_array(array, target_shape):
         padded_array = array[crop_slices[0], crop_slices[1], crop_slices[2]]
     
     return padded_array
-
-
-
-def to3dArray(stream):
-    inline_length = max(trace.stats.segy.trace_header.trace_sequence_number_within_line for trace in stream)
-    crossline_length = len(stream) // (inline_length + 1)
-    sample_depth_length = len(stream[0].data)
-
-    seismic_3d_array = np.zeros(
-    (inline_length + 1, crossline_length + 1, sample_depth_length)
-    )
-
-    # Populate the 3D array
-    for i, trace in enumerate(stream):
-        inline = trace.stats.segy.trace_header.trace_sequence_number_within_line
-        crossline = i % (
-            crossline_length + 1
-        )  # Calculate crossline dynamically based on iteration
-        seismic_3d_array[inline, crossline, :] = trace.data
-
-
-
-    new_3d_arr = []
-
-    for i in range(crossline_length):
-        new_3d_arr.append(np.flipud(np.rot90(seismic_3d_array[:, i, :])))
-    return np.array(new_3d_arr)
 
