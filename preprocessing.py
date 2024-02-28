@@ -95,6 +95,19 @@ class Seismic:
                     closestDist = dist
                     closestIdx = (x, y, round(target_coordinate[2]))
         return closestIdx
+    
+    def get_fault_indexes(self, fault:str):
+        lines = fault.split("\n")
+        coordinates = []
+        for i in lines:
+            coord = []
+            for n in i.split(" "):
+                if n!='':
+                    coord.append(float(n))
+                if len(coord)>=3:
+                    coordinates.append(self.get_index_from_coordinate(coord[0], coord[1], coord[2]))
+                    break
+        return coordinates
 
 
 
