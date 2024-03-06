@@ -1,3 +1,5 @@
 /SeismicData
 /__pycache__
 /.venv
+Faults.npy
+/runs
