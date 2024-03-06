@@ -1,7 +1,6 @@
 import numpy as np
 import math
 
-
 class Seismic:
     @staticmethod
     def __get_FFID(trace):
