@@ -1,5 +1,5 @@
-import torch.nn as nn
 import torch
+import torch.nn as nn
 class FaultExtractor(nn.Module):
     def __init__(self):
         super().__init__()
